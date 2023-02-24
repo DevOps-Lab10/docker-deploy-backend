@@ -1,0 +1,48 @@
+name: Deploy backend to host
+"on":
+  push:
+    branches:
+      - main
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: setup java
+        uses: actions/setup-java@v3
+        with:
+          java-version: '16'
+          distribution: 'adopt'
+
+      - name: run maven
+        run: |
+          mvn clean install -DskipTests -B
+          mkdir -p target/dependency && (cd target/dependency; unzip ../*.jar)
+
+      - name: set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+        - name: login to DockerHub
+        uses: actions/login-action@v3
+        with:
+          username: ${{secrets.DOCKER_HUB_USERNAME}}
+          password: ${{secrets.DOCKER_HUB_TOKEN}}
+
+      - name: prepare the docker-compose run
+        run: |
+          ls -l
+      - name: Build and Push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: saw96/234-deploylab-backend:latest
+
+      - name: prepare the docker-compose run
+        run: |
+          mkdir 234-deploylab-backend
+          cp docker-compose.yml 234-deploylab-backend/docker-compose.yml
+          docker-compose -H ${{secrets.HOST_SERVER}} down -remove-orphans
+          docker-compose -H ${{secrets.HOST_SERVER}} pull
+          docker-compose -H ${{secrets.HOST_SERVER}} up -d
